@@ -1,24 +1,16 @@
-# The following code will only execute
-# successfully when compression is complete
-
 import kagglehub
 import os
 import pandas as pd
 import json
 import random
 
-# Download latest version
 path = kagglehub.dataset_download("christophersinger/new-york-times-connections-archive")
-
-print("Path to dataset files:", path)
 
 df = pd.read_csv(os.path.join(path, "connections_clean.csv"))
 
-# Show first 5 rows
 print(df.head())
 examples = []
 
-# Group by puzzle date
 for date, group_df in df.groupby("date"):
     all_words = []
     output_groups = []
@@ -34,8 +26,8 @@ for date, group_df in df.groupby("date"):
     if len(output_groups) != 4 or len(all_words) != 16:
         continue
 
-    # Augment: shuffle 3 times
-    for _ in range(4):  # 1 original + 3 shuffles = 4 total
+    # augment dataset
+    for _ in range(4):
         shuffled_words = all_words.copy()
         random.shuffle(shuffled_words)
 
@@ -47,8 +39,5 @@ for date, group_df in df.groupby("date"):
             "output": output_text
         })
 
-# Save to file
 with open("nyt_dataset.json", "w") as f:
     json.dump(examples, f, indent=2)
-
-print(f"✅ Saved {len(examples)} augmented training examples to nyt_dataset.json")
