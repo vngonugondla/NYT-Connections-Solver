@@ -1,8 +1,14 @@
-import json
 from openai import OpenAI
+from dotenv import load_dotenv
+import os
+import json
+import random
+
+load_dotenv()
 
 # Initialize OpenAI
-client = OpenAI(api_key="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")
+api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=api_key)
 MODEL = "gpt-4-turbo"
 NUM_FEWSHOT = 3
 
@@ -83,14 +89,12 @@ Output format:
     messages.append({"role": "user", "content": test_prompt})
     return messages
 
-# Evaluate N puzzles
-N = 20
 correct_puzzles = 0
 correct_groups_total = 0
-test_items = dataset[:N]
+total_puzzles = len(dataset)
 
-for i, test_item in enumerate(test_items):
-    few_shot = dataset[i+1:i+1+NUM_FEWSHOT] if i+1+NUM_FEWSHOT <= len(dataset) else dataset[-NUM_FEWSHOT:]
+for i, test_item in enumerate(dataset):
+    few_shot = random.sample([ex for ex in dataset if ex != test_item], NUM_FEWSHOT)
     messages = build_messages_with_fewshot(few_shot, test_item["input"])
 
     response = client.chat.completions.create(
@@ -115,9 +119,8 @@ for i, test_item in enumerate(test_items):
 
 
 # Print final scores
-accuracy_puzzle = (correct_puzzles / N)
-accuracy_groups = (correct_groups_total / (N * 4))
+accuracy_puzzle = (correct_puzzles / total_puzzles)
+accuracy_groups = (correct_groups_total / (total_puzzles * 4))
 
 print(f"\nPuzzle-Level Accuracy: {accuracy_puzzle:.2%}")
 print(f"Group-Level Accuracy: {accuracy_groups:.2%}")
-

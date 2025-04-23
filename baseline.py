@@ -1,14 +1,17 @@
 import numpy as np
 from openai import OpenAI
+from dotenv import load_dotenv
+import os
 import json
 import re
 import time
 from itertools import combinations
 
+load_dotenv()
+
 # Initialize OpenAI
-client = OpenAI(
-    api_key="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"
-)
+api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=api_key)
 
 # Load dataset
 with open("nyt_dataset.json", "r") as f:
@@ -84,10 +87,7 @@ if __name__ == "__main__":
     group_possible_total = 0
     f1_scores = []
 
-    # Evaluate N puzzles
-    N = 20
-
-    for i, item in enumerate(data[:N]):
+    for i, item in enumerate(data):
         words = item["input"].split(":")[1].strip()
         expected_groups = extract_groups(item["output"])
 
