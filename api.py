@@ -1,7 +1,9 @@
+import numpy as np
 from openai import OpenAI
 import json
 import re
 import time
+from itertools import combinations
 
 # Initialize OpenAI
 client = OpenAI(
@@ -11,6 +13,28 @@ client = OpenAI(
 # Load dataset
 with open("nyt_dataset.json", "r") as f:
     data = json.load(f)
+
+def group_to_pairs(group_sets):
+    pairs = set()
+    for group in group_sets:
+        for a, b in combinations(sorted(group), 2):
+            pairs.add(frozenset([a, b]))
+    return pairs
+
+def compute_f1(predicted_sets, gold_sets):
+    pred_pairs = group_to_pairs(predicted_sets)
+    gold_pairs = group_to_pairs(gold_sets)
+
+    tp = len(pred_pairs & gold_pairs)
+    fp = len(pred_pairs - gold_pairs)
+    fn = len(gold_pairs - pred_pairs)
+
+    precision = tp / (tp + fp) if tp + fp > 0 else 0.0
+    recall = tp / (tp + fn) if tp + fn > 0 else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
+
+    return precision, recall, f1
+
 
 def extract_groups(output_text):
     def normalize(word):
@@ -58,6 +82,7 @@ if __name__ == "__main__":
     puzzle_total = 0
     group_match_total = 0
     group_possible_total = 0
+    f1_scores = []
 
     # Evaluate N puzzles
     N = 20
@@ -80,7 +105,7 @@ if __name__ == "__main__":
 
         try:
             response = client.chat.completions.create(
-                model="gpt-4-turbo",
+                model="gpt-4-0125-preview",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
             )
@@ -88,6 +113,10 @@ if __name__ == "__main__":
             predicted_groups = extract_groups(model_output)
 
             matched_groups = evaluate_groups(predicted_groups, expected_groups)
+            precision, recall, f1 = compute_f1(predicted_groups, expected_groups)
+            print(f"F1: {f1:.2f} | Precision: {precision:.2f} | Recall: {recall:.2f}")
+            f1_scores.append(f1)
+
             group_match_total += matched_groups
             group_possible_total += len(expected_groups)
 
@@ -111,3 +140,4 @@ if __name__ == "__main__":
 
     print(f"\nPuzzle-Level Accuracy: {accuracy_puzzle:.2%}")
     print(f"Group-Level Accuracy: {accuracy_groups:.2%}")
+    print(f"Average F1 Score: {np.mean(f1_scores):.2f}")

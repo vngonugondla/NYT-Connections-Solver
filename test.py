@@ -16,7 +16,7 @@ def extract_answer_groups(output_text):
             words = [w.strip().upper() for w in members.split(",")]
             gold_groups.append(set(words))
         except ValueError:
-            print("⚠️ Malformed group:", group)
+            print("Malformed group:", group)
     return gold_groups
 
 def score_group(group, word_to_embedding):
@@ -56,6 +56,29 @@ def beam_search_solver(scored_groups, beam_width=3):
 
     return beams[0][0] if beams else None
 
+def group_to_pairs(group_sets):
+    """Convert a list of groups into a set of unordered word pairs."""
+    pairs = set()
+    for group in group_sets:
+        for a, b in combinations(sorted(group), 2):
+            pairs.add(frozenset([a, b]))
+    return pairs
+
+def compute_f1(predicted_sets, gold_sets):
+    pred_pairs = group_to_pairs(predicted_sets)
+    gold_pairs = group_to_pairs(gold_sets)
+
+    tp = len(pred_pairs & gold_pairs)
+    fp = len(pred_pairs - gold_pairs)
+    fn = len(gold_pairs - pred_pairs)
+
+    precision = tp / (tp + fp) if tp + fp > 0 else 0.0
+    recall = tp / (tp + fn) if tp + fn > 0 else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
+
+    return precision, recall, f1
+
+
 with open("nyt_dataset.json", "r") as f:
     puzzles = json.load(f)
 
@@ -64,6 +87,8 @@ model = SentenceTransformer("all-MiniLM-L6-v2")
 correct_count = 0
 correct_groups_total = 0
 total = len(puzzles)
+
+f1_scores = []
 
 for idx, puzzle in enumerate(puzzles):
     words = clean_input(puzzle["input"])
@@ -93,13 +118,17 @@ for idx, puzzle in enumerate(puzzles):
 
         correct_groups_total += num_correct_groups
         predicted_sets = [set(word.upper().strip() for word in group) for group, _ in solution]
+
+        precision, recall, f1 = compute_f1(predicted_sets, gold_sets)
+        f1_scores.append(f1)
+        print(f"Puzzle #{idx + 1} — Precision: {precision:.2f}, Recall: {recall:.2f}, F1: {f1:.2f}")
         pred_fs = set(frozenset(g) for g in predicted_sets)
         gold_fs = set(frozenset(g) for g in gold_sets)
 
         if pred_fs == gold_fs:
             correct_count += 1
         else:
-            print(f"❌ Puzzle #{idx + 1} mismatch")
+            print(f"Puzzle #{idx + 1} mismatch")
             print("Predicted:")
             for g in predicted_sets:
                 print(" ", sorted(g))
@@ -108,7 +137,7 @@ for idx, puzzle in enumerate(puzzles):
                 print(" ", sorted(g))
             print("-" * 40)
     else:
-        print(f"⚠️ Puzzle #{idx + 1} — no solution found by solver.")
+        print(f"Puzzle #{idx + 1} — no solution found by solver.")
         print("Gold:")
         for g in gold_sets:
             print(" ", sorted(g))
@@ -116,3 +145,4 @@ for idx, puzzle in enumerate(puzzles):
 
 print(f"\nFully correct puzzle accuracy: {correct_count} / {total} = {correct_count / total:.2%}")
 print(f"Average number of correct groups per puzzle: {correct_groups_total / total:.2f}")
+print(f"\nAverage F1 Score across puzzles: {np.mean(f1_scores):.2f}")
