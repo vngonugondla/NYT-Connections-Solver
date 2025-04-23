@@ -1,0 +1,42 @@
+[
+  {
+    "group_number": 1,
+    "words": [
+      "red",
+      "yellow",
+      "green",
+      "blue"
+    ],
+    "avg_similarity": 0.6879
+  },
+  {
+    "group_number": 2,
+    "words": [
+      "Honda",
+      "Tesla",
+      "Ford",
+      "Toyota"
+    ],
+    "avg_similarity": 0.6002
+  },
+  {
+    "group_number": 3,
+    "words": [
+      "bracelet",
+      "ring",
+      "necklace",
+      "earring"
+    ],
+    "avg_similarity": 0.5465
+  },
+  {
+    "group_number": 4,
+    "words": [
+      "banana",
+      "orange",
+      "apple",
+      "mango"
+    ],
+    "avg_similarity": 0.4456
+  }
+]

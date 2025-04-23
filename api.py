@@ -53,61 +53,62 @@ def evaluate_groups(predicted, expected):
                 break
     return matched
 
-# Accuracy counters
-puzzle_correct = 0
-puzzle_total = 0
-group_match_total = 0
-group_possible_total = 0
+if __name__ == "__main__":
+    # Accuracy counters
+    puzzle_correct = 0
+    puzzle_total = 0
+    group_match_total = 0
+    group_possible_total = 0
 
-# Evaluate N puzzles
-N = 20
+    # Evaluate N puzzles
+    N = 20
 
-for i, item in enumerate(data[:N]):
-    words = item["input"].split(":")[1].strip()
-    expected_groups = extract_groups(item["output"])
+    for i, item in enumerate(data[:N]):
+        words = item["input"].split(":")[1].strip()
+        expected_groups = extract_groups(item["output"])
 
-    prompt = f"""Group the following 16 words into 4 categories of 4 words each based on common themes:
+        prompt = f"""Group the following 16 words into 4 categories of 4 words each based on common themes:
 
-Words: {words}
+    Words: {words}
 
-Only return the list of groups. Do not include any explanations or labels.
+    Only return the list of groups. Do not include any explanations or labels.
 
-Output format:
-1. [group of 4 words]
-2. [group of 4 words]
-3. [group of 4 words]
-4. [group of 4 words]"""
+    Output format:
+    1. [group of 4 words]
+    2. [group of 4 words]
+    3. [group of 4 words]
+    4. [group of 4 words]"""
 
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4-turbo",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.3,
-        )
-        model_output = response.choices[0].message.content
-        predicted_groups = extract_groups(model_output)
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4-turbo",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+            )
+            model_output = response.choices[0].message.content
+            predicted_groups = extract_groups(model_output)
 
-        matched_groups = evaluate_groups(predicted_groups, expected_groups)
-        group_match_total += matched_groups
-        group_possible_total += len(expected_groups)
+            matched_groups = evaluate_groups(predicted_groups, expected_groups)
+            group_match_total += matched_groups
+            group_possible_total += len(expected_groups)
 
-        if expected_groups and matched_groups == len(expected_groups):
-            puzzle_correct += 1
-        puzzle_total += 1
+            if expected_groups and matched_groups == len(expected_groups):
+                puzzle_correct += 1
+            puzzle_total += 1
 
-        print(f"\n Puzzle #{i+1}")
-        print(f"Words: {words}")
-        print(f"Model Output:\n{model_output}")
-        print(f"Matched groups: {matched_groups}/{len(expected_groups)}")
+            print(f"\n Puzzle #{i+1}")
+            print(f"Words: {words}")
+            print(f"Model Output:\n{model_output}")
+            print(f"Matched groups: {matched_groups}/{len(expected_groups)}")
 
-        time.sleep(1)
+            time.sleep(1)
 
-    except Exception as e:
-        print(f"Error on puzzle #{i+1}: {e}")
+        except Exception as e:
+            print(f"Error on puzzle #{i+1}: {e}")
 
-# Print final scores
-accuracy_puzzle = puzzle_correct / puzzle_total if puzzle_total else 0
-accuracy_groups = group_match_total / group_possible_total if group_possible_total else 0
+    # Print final scores
+    accuracy_puzzle = puzzle_correct / puzzle_total if puzzle_total else 0
+    accuracy_groups = group_match_total / group_possible_total if group_possible_total else 0
 
-print(f"\n Puzzle-Level Accuracy: {accuracy_puzzle:.2%}")
-print(f"Group-Level Accuracy: {accuracy_groups:.2%}")
+    print(f"\n Puzzle-Level Accuracy: {accuracy_puzzle:.2%}")
+    print(f"Group-Level Accuracy: {accuracy_groups:.2%}")
