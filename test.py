@@ -79,13 +79,11 @@ for idx, puzzle in enumerate(puzzles):
     solution = beam_search_solver(scored_groups)
 
     if solution:
-        # Normalize predicted groups
         predicted_sets = [set(word.upper().strip() for word in group) for group, _ in solution]
         gold_sets = extract_answer_groups(puzzle["output"])
         gold_used = set()
         num_correct_groups = 0
 
-        # For each predicted group, check if it exactly matches any unused gold group
         for pred in predicted_sets:
             for i, gold in enumerate(gold_sets):
                 if i not in gold_used and pred == gold:

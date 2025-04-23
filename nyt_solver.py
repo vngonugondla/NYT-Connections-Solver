@@ -52,5 +52,3 @@ if solution:
 
 with open("final_connection_groups.json", "w") as f:
     json.dump(result, f, indent=2)
-
-print("✅ Puzzle solution saved to final_connection_groups.json")
