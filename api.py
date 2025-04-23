@@ -3,17 +3,16 @@ from openai import OpenAI
 import json
 import re
 import time
-
-# Load dataset
-with open("nyt_dataset.json", "r") as f:
-    data = json.load(f)
+from itertools import combinations
 
 # Initialize OpenAI
 client = OpenAI(
     api_key="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"
 )
 
-from itertools import combinations
+# Load dataset
+with open("nyt_dataset.json", "r") as f:
+    data = json.load(f)
 
 def group_to_pairs(group_sets):
     pairs = set()
@@ -35,8 +34,6 @@ def compute_f1(predicted_sets, gold_sets):
     f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
 
     return precision, recall, f1
-
-
 
 
 def extract_groups(output_text):
@@ -127,7 +124,7 @@ if __name__ == "__main__":
                 puzzle_correct += 1
             puzzle_total += 1
 
-            print(f"\n Puzzle #{i+1}")
+            print(f"\nPuzzle #{i+1}")
             print(f"Words: {words}")
             print(f"Model Output:\n{model_output}")
             print(f"Matched groups: {matched_groups}/{len(expected_groups)}")
@@ -141,6 +138,6 @@ if __name__ == "__main__":
     accuracy_puzzle = puzzle_correct / puzzle_total if puzzle_total else 0
     accuracy_groups = group_match_total / group_possible_total if group_possible_total else 0
 
-    print(f"\n Puzzle-Level Accuracy: {accuracy_puzzle:.2%}")
+    print(f"\nPuzzle-Level Accuracy: {accuracy_puzzle:.2%}")
     print(f"Group-Level Accuracy: {accuracy_groups:.2%}")
     print(f"Average F1 Score: {np.mean(f1_scores):.2f}")
