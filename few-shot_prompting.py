@@ -3,6 +3,8 @@ from dotenv import load_dotenv
 import os
 import json
 import random
+import numpy as np
+from itertools import combinations
 
 load_dotenv()
 
@@ -53,6 +55,30 @@ def groups_match(pred_groups, true_groups):
                 break
     return matched
 
+def group_to_pairs(group_sets):
+    pairs = set()
+    for group in group_sets:
+        for a, b in combinations(sorted(group), 2):
+            pairs.add(frozenset([a, b]))
+    return pairs
+
+def compute_f1(predicted_sets, gold_sets):
+    pred_pairs = group_to_pairs(predicted_sets)
+    gold_pairs = group_to_pairs(gold_sets)
+
+    if not pred_pairs and not gold_pairs:
+        return 0.0, 0.0, 0.0
+
+    tp = len(pred_pairs & gold_pairs)
+    fp = len(pred_pairs - gold_pairs)
+    fn = len(gold_pairs - pred_pairs)
+
+    precision = tp / (tp + fp) if tp + fp > 0 else 0.0
+    recall = tp / (tp + fn) if tp + fn > 0 else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
+
+    return precision, recall, f1
+
 def build_messages_with_fewshot(few_shot, test_input):
     messages = []
 
@@ -92,6 +118,7 @@ Output format:
 correct_puzzles = 0
 correct_groups_total = 0
 total_puzzles = len(dataset)
+f1_scores = []
 
 for i, test_item in enumerate(dataset):
     few_shot = random.sample([ex for ex in dataset if ex != test_item], NUM_FEWSHOT)
@@ -112,10 +139,14 @@ for i, test_item in enumerate(dataset):
     if correct_groups == 4:
         correct_puzzles += 1
 
+    precision, recall, f1 = compute_f1(pred_groups, true_groups)
+    f1_scores.append(f1)
+
     print(f"\nPuzzle #{i+1}")
     print("Words:", test_item["input"].split(":")[-1].strip())
     print("Model Output:\n", pred_output)
     print("Matched groups:", correct_groups, "/ 4")
+    print(f"F1: {f1:.2f} | Precision: {precision:.2f} | Recall: {recall:.2f}")
 
 
 # Print final scores
@@ -124,3 +155,4 @@ accuracy_groups = (correct_groups_total / (total_puzzles * 4))
 
 print(f"\nPuzzle-Level Accuracy: {accuracy_puzzle:.2%}")
 print(f"Group-Level Accuracy: {accuracy_groups:.2%}")
+print(f"Average F1 Score: {np.mean(f1_scores):.2f}")

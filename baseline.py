@@ -28,6 +28,9 @@ def compute_f1(predicted_sets, gold_sets):
     pred_pairs = group_to_pairs(predicted_sets)
     gold_pairs = group_to_pairs(gold_sets)
 
+    if not pred_pairs and not gold_pairs:
+        return 0.0, 0.0, 0.0
+
     tp = len(pred_pairs & gold_pairs)
     fp = len(pred_pairs - gold_pairs)
     fn = len(gold_pairs - pred_pairs)
@@ -114,7 +117,6 @@ if __name__ == "__main__":
 
             matched_groups = evaluate_groups(predicted_groups, expected_groups)
             precision, recall, f1 = compute_f1(predicted_groups, expected_groups)
-            print(f"F1: {f1:.2f} | Precision: {precision:.2f} | Recall: {recall:.2f}")
             f1_scores.append(f1)
 
             group_match_total += matched_groups
@@ -128,6 +130,7 @@ if __name__ == "__main__":
             print(f"Words: {words}")
             print(f"Model Output:\n{model_output}")
             print(f"Matched groups: {matched_groups}/{len(expected_groups)}")
+            print(f"F1: {f1:.2f} | Precision: {precision:.2f} | Recall: {recall:.2f}")
 
             time.sleep(1)
 
