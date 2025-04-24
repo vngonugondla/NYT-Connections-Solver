@@ -249,11 +249,11 @@ def run_test(num_puzzles=None):
     llm_correct_groups_total = 0
     few_shot_correct_groups_total = 0
 
-f1_scores = []
+    f1_scores = []
 
-for idx, puzzle in enumerate(puzzles):
-    words = clean_input(puzzle["input"])
-    gold_sets = extract_answer_groups(puzzle["output"])
+    for idx, puzzle in enumerate(puzzles):
+        words = clean_input(puzzle["input"])
+        gold_sets = extract_answer_groups(puzzle["output"])
 
 
     total = len(puzzles_to_test)
@@ -387,6 +387,8 @@ for idx, puzzle in enumerate(puzzles):
     print(f"LLM Baseline average correct groups per puzzle: {llm_correct_groups_total / total:.2f}")
     print(f"Few-Shot fully correct puzzle accuracy: {few_shot_correct_count} / {total} = {few_shot_correct_count / total:.2%}")
     print(f"Few-Shot average correct groups per puzzle: {few_shot_correct_groups_total / total:.2f}")
+    
+
 if __name__ == "__main__":
     # Run test on first 5 puzzles by default
     # run_test(num_puzzles=50)
