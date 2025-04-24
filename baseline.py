@@ -1,16 +1,45 @@
+import numpy as np
 from openai import OpenAI
+from dotenv import load_dotenv
+import os
 import json
 import re
 import time
+from itertools import combinations
+
+load_dotenv()
+
+# Initialize OpenAI
+api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=api_key)
 
 # Load dataset
 with open("nyt_dataset.json", "r") as f:
     data = json.load(f)
 
-# Initialize OpenAI
-client = OpenAI(
-    api_key="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"
-)
+def group_to_pairs(group_sets):
+    pairs = set()
+    for group in group_sets:
+        for a, b in combinations(sorted(group), 2):
+            pairs.add(frozenset([a, b]))
+    return pairs
+
+def compute_f1(predicted_sets, gold_sets):
+    pred_pairs = group_to_pairs(predicted_sets)
+    gold_pairs = group_to_pairs(gold_sets)
+
+    if not pred_pairs and not gold_pairs:
+        return 0.0, 0.0, 0.0
+
+    tp = len(pred_pairs & gold_pairs)
+    fp = len(pred_pairs - gold_pairs)
+    fn = len(gold_pairs - pred_pairs)
+
+    precision = tp / (tp + fp) if tp + fp > 0 else 0.0
+    recall = tp / (tp + fn) if tp + fn > 0 else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
+
+    return precision, recall, f1
 
 
 def extract_groups(output_text):
@@ -59,11 +88,9 @@ if __name__ == "__main__":
     puzzle_total = 0
     group_match_total = 0
     group_possible_total = 0
+    f1_scores = []
 
-    # Evaluate N puzzles
-    N = 20
-
-    for i, item in enumerate(data[:N]):
+    for i, item in enumerate(data):
         words = item["input"].split(":")[1].strip()
         expected_groups = extract_groups(item["output"])
 
@@ -81,7 +108,7 @@ if __name__ == "__main__":
 
         try:
             response = client.chat.completions.create(
-                model="gpt-4-turbo",
+                model="gpt-4-0125-preview",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
             )
@@ -89,6 +116,9 @@ if __name__ == "__main__":
             predicted_groups = extract_groups(model_output)
 
             matched_groups = evaluate_groups(predicted_groups, expected_groups)
+            precision, recall, f1 = compute_f1(predicted_groups, expected_groups)
+            f1_scores.append(f1)
+
             group_match_total += matched_groups
             group_possible_total += len(expected_groups)
 
@@ -96,10 +126,11 @@ if __name__ == "__main__":
                 puzzle_correct += 1
             puzzle_total += 1
 
-            print(f"\n Puzzle #{i+1}")
+            print(f"\nPuzzle #{i+1}")
             print(f"Words: {words}")
             print(f"Model Output:\n{model_output}")
             print(f"Matched groups: {matched_groups}/{len(expected_groups)}")
+            print(f"F1: {f1:.2f} | Precision: {precision:.2f} | Recall: {recall:.2f}")
 
             time.sleep(1)
 
@@ -110,5 +141,6 @@ if __name__ == "__main__":
     accuracy_puzzle = puzzle_correct / puzzle_total if puzzle_total else 0
     accuracy_groups = group_match_total / group_possible_total if group_possible_total else 0
 
-    print(f"\n Puzzle-Level Accuracy: {accuracy_puzzle:.2%}")
+    print(f"\nPuzzle-Level Accuracy: {accuracy_puzzle:.2%}")
     print(f"Group-Level Accuracy: {accuracy_groups:.2%}")
+    print(f"Average F1 Score: {np.mean(f1_scores):.2f}")

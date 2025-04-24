@@ -1,14 +1,14 @@
 import json
-from api import evaluate_groups, client
+from baseline import evaluate_groups, client
 
 
 with open("nyt_dataset.json", "r") as f:
     data = json.load(f)
 
 
-# function to generate N candidate groups given a puzzle 
+# function to generate N candidate groups given a puzzle
 def generate_candidate_groups_baseline(puzzle, num_groups=40):
-    
+
     prompt = f"""Generate {num_groups} candidate groups of 4 words each from the given puzzle. Return the response in the following JSON format:
     {{
         "groups": [
@@ -18,9 +18,9 @@ def generate_candidate_groups_baseline(puzzle, num_groups=40):
         ]
     }}
     Make sure all words are in UPPERCASE.
-    
+
     Puzzle: {puzzle}"""
-    
+
     response = client.chat.completions.create(
         model="gpt-4-turbo",
         messages=[{"role": "user", "content": prompt}],

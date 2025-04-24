@@ -21,7 +21,7 @@ def extract_answer_groups(output_text):
             words = [w.strip().upper() for w in members.split(",")]
             gold_groups.append(set(words))
         except ValueError:
-            print("⚠️ Malformed group:", group)
+            print("Malformed group:", group)
     return gold_groups
 
 def score_group(group, word_to_embedding):
@@ -206,6 +206,29 @@ def beam_search_solver(scored_groups, beam_width=3):
 
     return beams[0][0] if beams else None
 
+def group_to_pairs(group_sets):
+    """Convert a list of groups into a set of unordered word pairs."""
+    pairs = set()
+    for group in group_sets:
+        for a, b in combinations(sorted(group), 2):
+            pairs.add(frozenset([a, b]))
+    return pairs
+
+def compute_f1(predicted_sets, gold_sets):
+    pred_pairs = group_to_pairs(predicted_sets)
+    gold_pairs = group_to_pairs(gold_sets)
+
+    tp = len(pred_pairs & gold_pairs)
+    fp = len(pred_pairs - gold_pairs)
+    fn = len(gold_pairs - pred_pairs)
+
+    precision = tp / (tp + fp) if tp + fp > 0 else 0.0
+    recall = tp / (tp + fn) if tp + fn > 0 else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0.0
+
+    return precision, recall, f1
+
+
 with open("nyt_dataset.json", "r") as f:
     puzzles = json.load(f)
 
@@ -218,12 +241,20 @@ def run_test(num_puzzles=None):
     else:
         puzzles_to_test = puzzles
 
+
     correct_count = 0
     llm_correct_count = 0
     few_shot_correct_count = 0
     correct_groups_total = 0
     llm_correct_groups_total = 0
     few_shot_correct_groups_total = 0
+
+f1_scores = []
+
+for idx, puzzle in enumerate(puzzles):
+    words = clean_input(puzzle["input"])
+    gold_sets = extract_answer_groups(puzzle["output"])
+
 
     total = len(puzzles_to_test)
 
@@ -257,6 +288,7 @@ def run_test(num_puzzles=None):
         few_shot_solution = beam_search_solver(few_shot_scored_groups)
 
         gold_sets = extract_answer_groups(puzzle["output"])
+
         print(f"\nEvaluating Puzzle #{idx + 1}")
         print("-" * 40)
 
@@ -347,6 +379,7 @@ def run_test(num_puzzles=None):
             print(" ", sorted(g))
         print("-" * 40)
 
+
     print(f"\nResults for {total} puzzles:")
     print(f"Considering All Groups fully correct puzzle accuracy: {correct_count} / {total} = {correct_count / total:.2%}")
     print(f"Considering All Groups average correct groups per puzzle: {correct_groups_total / total:.2f}")
@@ -354,7 +387,6 @@ def run_test(num_puzzles=None):
     print(f"LLM Baseline average correct groups per puzzle: {llm_correct_groups_total / total:.2f}")
     print(f"Few-Shot fully correct puzzle accuracy: {few_shot_correct_count} / {total} = {few_shot_correct_count / total:.2%}")
     print(f"Few-Shot average correct groups per puzzle: {few_shot_correct_groups_total / total:.2f}")
-
 if __name__ == "__main__":
     # Run test on first 5 puzzles by default
     # run_test(num_puzzles=50)
@@ -362,3 +394,4 @@ if __name__ == "__main__":
     # print(run_gpt4_embedding_test(client, puzzles[0]["input"]))
     print("\nTesting with Ollama:")
     print(run_ollama_test(puzzles[0]["input"]))
+
