@@ -25,18 +25,5 @@ for date, group_df in df.groupby("date"):
     if len(output_groups) != 4 or len(all_words) != 16:
         continue
 
-    # augment dataset
-    # for _ in range(4):
-    #     shuffled_words = all_words.copy()
-    #     random.shuffle(shuffled_words)
-
-    #     input_text = "Group the following words into 4 meaningful categories: " + ", ".join(shuffled_words)
-    #     output_text = "; ".join(output_groups)
-
-    #     examples.append({
-    #         "input": input_text,
-    #         "output": output_text
-    #     })
-
 with open("nyt_dataset.json", "w") as f:
     json.dump(examples, f, indent=2)
