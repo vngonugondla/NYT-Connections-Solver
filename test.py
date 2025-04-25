@@ -5,7 +5,7 @@ import json
 import re
 import requests
 
-from api import client
+from baseline import client
 
 from connectLLMSolver import generate_candidate_groups_baseline, generate_candidate_groups_few_shot
 
@@ -250,11 +250,19 @@ def run_test(num_puzzles=None):
     few_shot_correct_groups_total = 0
 
     f1_scores = []
+    llm_f1_scores = []
+    few_shot_f1_scores = []
 
-    for idx, puzzle in enumerate(puzzles):
-        words = clean_input(puzzle["input"])
-        gold_sets = extract_answer_groups(puzzle["output"])
-
+    # Greedy decoding metrics via solve (reuse candidate sets, no extra API calls)
+    greedy_embed_correct_count = 0
+    greedy_embed_f1_scores = []
+    greedy_llm_correct_count = 0
+    greedy_llm_f1_scores = []
+    greedy_fs_correct_count = 0
+    greedy_fs_f1_scores = []
+    greedy_embed_groups_total = 0
+    greedy_llm_groups_total = 0
+    greedy_fs_groups_total = 0
 
     total = len(puzzles_to_test)
 
@@ -274,14 +282,30 @@ def run_test(num_puzzles=None):
         llm_generated_groups = [list(group) for group in llm_generated_groups]
         few_shot_generated_groups = [list(group) for group in few_shot_generated_groups]
 
-        scored_groups = [(group, score_group(group, word_to_embedding)) for group in all_groups]
-        scored_groups.sort(key=lambda x: x[1], reverse=True)
+        # Filter out words that don't exist in word_to_embedding
+        llm_generated_groups = [
+            [word for word in group if word in word_to_embedding]
+            for group in llm_generated_groups
+        ]
+        # Only keep groups that still have at least 4 words after filtering
+        llm_generated_groups = [group for group in llm_generated_groups if len(group) == 4]
+
+        # Also filter few-shot generated groups
+        few_shot_generated_groups = [
+            [word for word in group if word in word_to_embedding]
+            for group in few_shot_generated_groups
+        ]
+        # Only keep groups that still have at least 4 words after filtering
+        few_shot_generated_groups = [group for group in few_shot_generated_groups if len(group) == 4]
 
         llm_scored_groups = [(group, score_group(group, word_to_embedding)) for group in llm_generated_groups]
         llm_scored_groups.sort(key=lambda x: x[1], reverse=True)
 
         few_shot_scored_groups = [(group, score_group(group, word_to_embedding)) for group in few_shot_generated_groups]
         few_shot_scored_groups.sort(key=lambda x: x[1], reverse=True)
+
+        scored_groups = [(group, score_group(group, word_to_embedding)) for group in all_groups]
+        scored_groups.sort(key=lambda x: x[1], reverse=True)
 
         solution = beam_search_solver(scored_groups)
         llm_solution = beam_search_solver(llm_scored_groups)
@@ -309,6 +333,10 @@ def run_test(num_puzzles=None):
             pred_fs = set(frozenset(g) for g in predicted_sets)
             gold_fs = set(frozenset(g) for g in gold_sets)
 
+            # Calculate F1 score for brute force
+            precision, recall, f1 = compute_f1(predicted_sets, gold_sets)
+            f1_scores.append(f1)
+
             if pred_fs == gold_fs:
                 print(f"✅ Brute Force: Fully Correct")
                 correct_count += 1
@@ -317,8 +345,10 @@ def run_test(num_puzzles=None):
                 print("Predicted:")
                 for g in predicted_sets:
                     print(" ", sorted(g))
+            print(f"F1: {f1:.2f} | Precision: {precision:.2f} | Recall: {recall:.2f}")
         else:
             print("⚠️ Brute Force: No solution found")
+            f1_scores.append(0.0)
 
         # Evaluate LLM Baseline solution
         if llm_solution:
@@ -336,6 +366,10 @@ def run_test(num_puzzles=None):
             llm_correct_groups_total += llm_num_correct_groups
             llm_pred_fs = set(frozenset(g) for g in llm_predicted_sets)
 
+            # Calculate F1 score for LLM Baseline
+            llm_precision, llm_recall, llm_f1 = compute_f1(llm_predicted_sets, gold_sets)
+            llm_f1_scores.append(llm_f1)
+
             if llm_pred_fs == gold_fs:
                 print(f"✅ LLM Baseline: Fully Correct")
                 llm_correct_count += 1
@@ -344,8 +378,10 @@ def run_test(num_puzzles=None):
                 print("LLM Predicted:")
                 for g in llm_predicted_sets:
                     print(" ", sorted(g))
+            print(f"F1: {llm_f1:.2f} | Precision: {llm_precision:.2f} | Recall: {llm_recall:.2f}")
         else:
             print("⚠️ LLM Baseline: No solution found")
+            llm_f1_scores.append(0.0)
 
         # Evaluate Few-Shot solution
         if few_shot_solution:
@@ -363,6 +399,10 @@ def run_test(num_puzzles=None):
             few_shot_correct_groups_total += few_shot_num_correct_groups
             few_shot_pred_fs = set(frozenset(g) for g in few_shot_predicted_sets)
 
+            # Calculate F1 score for Few-Shot
+            few_shot_precision, few_shot_recall, few_shot_f1 = compute_f1(few_shot_predicted_sets, gold_sets)
+            few_shot_f1_scores.append(few_shot_f1)
+
             if few_shot_pred_fs == gold_fs:
                 print(f"✅ Few-Shot: Fully Correct")
                 few_shot_correct_count += 1
@@ -371,8 +411,71 @@ def run_test(num_puzzles=None):
                 print("Few-Shot Predicted:")
                 for g in few_shot_predicted_sets:
                     print(" ", sorted(g))
+            print(f"F1: {few_shot_f1:.2f} | Precision: {few_shot_precision:.2f} | Recall: {few_shot_recall:.2f}")
         else:
             print("⚠️ Few-Shot: No solution found")
+            few_shot_f1_scores.append(0.0)
+
+        # Greedy decode via solve for embedding-scored groups
+        gold_fs = set(map(frozenset, gold_sets))
+        embed_sol = solve(scored_groups)
+        if embed_sol:
+            ge_used = set()
+            ge_match_count = 0
+            for pred in [set(group) for group, _ in embed_sol]:
+                for i, gold in enumerate(gold_sets):
+                    if i not in ge_used and pred == gold:
+                        ge_match_count += 1
+                        ge_used.add(i)
+                        break
+            greedy_embed_groups_total += ge_match_count
+            embed_pred_sets = [set(group) for group, _ in embed_sol]
+            _, _, ge_f1 = compute_f1(embed_pred_sets, gold_sets)
+            greedy_embed_f1_scores.append(ge_f1)
+            if set(map(frozenset, embed_pred_sets)) == gold_fs:
+                greedy_embed_correct_count += 1
+        else:
+            greedy_embed_f1_scores.append(0.0)
+
+        # Greedy decode via solve for LLM-scored groups
+        llm_sol = solve(llm_scored_groups)
+        if llm_sol:
+            ll_used = set()
+            ll_match_count = 0
+            for pred in [set(group) for group, _ in llm_sol]:
+                for i, gold in enumerate(gold_sets):
+                    if i not in ll_used and pred == gold:
+                        ll_match_count += 1
+                        ll_used.add(i)
+                        break
+            greedy_llm_groups_total += ll_match_count
+            llm_pred_sets = [set(group) for group, _ in llm_sol]
+            _, _, gl_f1 = compute_f1(llm_pred_sets, gold_sets)
+            greedy_llm_f1_scores.append(gl_f1)
+            if set(map(frozenset, llm_pred_sets)) == gold_fs:
+                greedy_llm_correct_count += 1
+        else:
+            greedy_llm_f1_scores.append(0.0)
+
+        # Greedy decode via solve for few-shot-scored groups
+        fs_sol = solve(few_shot_scored_groups)
+        if fs_sol:
+            fs_used = set()
+            fs_match_count = 0
+            for pred in [set(group) for group, _ in fs_sol]:
+                for i, gold in enumerate(gold_sets):
+                    if i not in fs_used and pred == gold:
+                        fs_match_count += 1
+                        fs_used.add(i)
+                        break
+            greedy_fs_groups_total += fs_match_count
+            fs_pred_sets = [set(group) for group, _ in fs_sol]
+            _, _, fs_f1 = compute_f1(fs_pred_sets, gold_sets)
+            greedy_fs_f1_scores.append(fs_f1)
+            if set(map(frozenset, fs_pred_sets)) == gold_fs:
+                greedy_fs_correct_count += 1
+        else:
+            greedy_fs_f1_scores.append(0.0)
 
         print("\nGold Standard Groups:")
         for g in gold_sets:
@@ -383,17 +486,29 @@ def run_test(num_puzzles=None):
     print(f"\nResults for {total} puzzles:")
     print(f"Considering All Groups fully correct puzzle accuracy: {correct_count} / {total} = {correct_count / total:.2%}")
     print(f"Considering All Groups average correct groups per puzzle: {correct_groups_total / total:.2f}")
+    print(f"Considering All Groups average F1 score: {np.mean(f1_scores):.2f}")
+    
     print(f"LLM Baseline fully correct puzzle accuracy: {llm_correct_count} / {total} = {llm_correct_count / total:.2%}")
     print(f"LLM Baseline average correct groups per puzzle: {llm_correct_groups_total / total:.2f}")
+    print(f"LLM Baseline average F1 score: {np.mean(llm_f1_scores):.2f}")
+    
     print(f"Few-Shot fully correct puzzle accuracy: {few_shot_correct_count} / {total} = {few_shot_correct_count / total:.2%}")
     print(f"Few-Shot average correct groups per puzzle: {few_shot_correct_groups_total / total:.2f}")
-    
+    print(f"Few-Shot average F1 score: {np.mean(few_shot_f1_scores):.2f}")
+
+    # Greedy decoding summaries
+    print(f"Greedy Embedding fully correct puzzle accuracy: {greedy_embed_correct_count} / {total} = {greedy_embed_correct_count/total:.2%}")
+    print(f"Greedy Embedding average correct groups per puzzle: {greedy_embed_groups_total/total:.2f}")
+    print(f"Greedy Embedding average F1 score: {np.mean(greedy_embed_f1_scores):.2f}")
+
+    print(f"Greedy LLM fully correct puzzle accuracy: {greedy_llm_correct_count} / {total} = {greedy_llm_correct_count/total:.2%}")
+    print(f"Greedy LLM average correct groups per puzzle: {greedy_llm_groups_total/total:.2f}")
+    print(f"Greedy LLM average F1 score: {np.mean(greedy_llm_f1_scores):.2f}")
+
+    print(f"Greedy Few-Shot fully correct puzzle accuracy: {greedy_fs_correct_count} / {total} = {greedy_fs_correct_count/total:.2%}")
+    print(f"Greedy Few-Shot average correct groups per puzzle: {greedy_fs_groups_total/total:.2f}")
+    print(f"Greedy Few-Shot average F1 score: {np.mean(greedy_fs_f1_scores):.2f}")
+
 
 if __name__ == "__main__":
-    # Run test on first 5 puzzles by default
-    # run_test(num_puzzles=50)
-    print("Testing with GPT-4:")
-    # print(run_gpt4_embedding_test(client, puzzles[0]["input"]))
-    print("\nTesting with Ollama:")
-    print(run_ollama_test(puzzles[0]["input"]))
-
+    run_test(num_puzzles=50)
