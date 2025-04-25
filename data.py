@@ -2,7 +2,6 @@ import kagglehub
 import os
 import pandas as pd
 import json
-import random
 
 path = kagglehub.dataset_download("christophersinger/new-york-times-connections-archive")
 
@@ -27,17 +26,17 @@ for date, group_df in df.groupby("date"):
         continue
 
     # augment dataset
-    for _ in range(4):
-        shuffled_words = all_words.copy()
-        random.shuffle(shuffled_words)
+    # for _ in range(4):
+    #     shuffled_words = all_words.copy()
+    #     random.shuffle(shuffled_words)
 
-        input_text = "Group the following words into 4 meaningful categories: " + ", ".join(shuffled_words)
-        output_text = "; ".join(output_groups)
+    #     input_text = "Group the following words into 4 meaningful categories: " + ", ".join(shuffled_words)
+    #     output_text = "; ".join(output_groups)
 
-        examples.append({
-            "input": input_text,
-            "output": output_text
-        })
+    #     examples.append({
+    #         "input": input_text,
+    #         "output": output_text
+    #     })
 
 with open("nyt_dataset.json", "w") as f:
     json.dump(examples, f, indent=2)
