@@ -81,19 +81,19 @@ Return ONLY a valid JSON object with your answer."""
     try:
         model_output = json.loads(response.choices[0].message.content)
         if not isinstance(model_output, dict) or "groups" not in model_output:
-            raise ValueError("Invalid response format: missing 'groups' key")
+            raise ValueError("Error")
         if not isinstance(model_output["groups"], list):
-            raise ValueError("Invalid response format: 'groups' is not a list")
+            raise ValueError("Error")
         for group in model_output["groups"]:
             if not isinstance(group, list) or len(group) != 4:
-                raise ValueError("Invalid group format: each group must be a list of exactly 4 strings")
+                raise ValueError("Error")
             if not all(isinstance(word, str) for word in group):
-                raise ValueError("Invalid group format: all elements must be strings")
+                raise ValueError("Error")
         
         groups = [set(group) for group in model_output["groups"]]
         return groups
     except (json.JSONDecoder.JSONDecodeError, KeyError, TypeError, ValueError) as e:
-        print(f"Error parsing LLM response: {e}")
+        print("Error")
         return []
 
 
