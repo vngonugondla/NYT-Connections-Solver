@@ -2,8 +2,6 @@ from itertools import combinations
 from sentence_transformers import SentenceTransformer, util
 import numpy as np
 import json
-import re
-import requests
 
 from baseline import client
 
@@ -21,7 +19,7 @@ def extract_answer_groups(output_text):
             words = [w.strip().upper() for w in members.split(",")]
             gold_groups.append(set(words))
         except ValueError:
-            print("Malformed group:", group)
+            print("Error")
     return gold_groups
 
 def score_group(group, word_to_embedding):
@@ -161,7 +159,7 @@ def run_test(num_puzzles=None):
 
         gold_sets = extract_answer_groups(puzzle["output"])
 
-        print(f"\nEvaluating Puzzle #{idx + 1}")
+        print(f"\nPuzzle #{idx + 1}")
         print("-" * 40)
 
         if solution:
@@ -215,7 +213,7 @@ def run_test(num_puzzles=None):
             llm_f1_scores.append(llm_f1)
 
             if llm_pred_fs == gold_fs:
-                print(f"✅ LLM Baseline: Fully Correct")
+                print(f"LLM Baseline: Fully Correct")
                 llm_correct_count += 1
             else:
                 print(f"LLM Baseline: Mismatch")
@@ -316,7 +314,7 @@ def run_test(num_puzzles=None):
         else:
             greedy_fs_f1_scores.append(0.0)
 
-        print("\nGold Standard Groups:")
+        print("\nGold Groups:")
         for g in gold_sets:
             print(" ", sorted(g))
         print("-" * 40)
