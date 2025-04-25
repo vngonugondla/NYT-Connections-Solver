@@ -5,8 +5,6 @@ from baseline import evaluate_groups, client
 with open("nyt_dataset.json", "r") as f:
     data = json.load(f)
 
-
-# function to generate N candidate groups given a puzzle
 def generate_candidate_groups_baseline(puzzle, num_groups=40):
 
     prompt = f"""Generate {num_groups} candidate groups of 4 words each from the given puzzle. Return the response in the following JSON format:
@@ -29,9 +27,7 @@ def generate_candidate_groups_baseline(puzzle, num_groups=40):
     )
 
     try:
-        # Parse the JSON response
         model_output = json.loads(response.choices[0].message.content)
-        # Convert lists to sets
         groups = [set(group) for group in model_output["groups"]]
         return groups
     except (json.JSONDecodeError, KeyError, TypeError) as e:
@@ -40,7 +36,6 @@ def generate_candidate_groups_baseline(puzzle, num_groups=40):
 
 
 def generate_candidate_groups_few_shot(puzzle, num_groups=40):
-    # Create few-shot examples from the dataset with explicit JSON format
     few_shot_prompt = f"""Given a set of 16 words, generate exactly {num_groups} groups of 4 related words each. Each group should contain exactly 4 words from the puzzle, and words can be reused across different groups.
 
 Here's an example input and its expected output format:
@@ -80,13 +75,11 @@ Return ONLY a valid JSON object with your answer."""
         messages=[{"role": "user", "content": few_shot_prompt}],
         temperature=0.8,
         response_format={ "type": "json_object" },
-        max_tokens=2000  # Increased to ensure we get all groups
+        max_tokens=2000
     )
 
     try:
-        # Parse the JSON response
         model_output = json.loads(response.choices[0].message.content)
-        # Validate the response format
         if not isinstance(model_output, dict) or "groups" not in model_output:
             raise ValueError("Invalid response format: missing 'groups' key")
         if not isinstance(model_output["groups"], list):
@@ -97,7 +90,6 @@ Return ONLY a valid JSON object with your answer."""
             if not all(isinstance(word, str) for word in group):
                 raise ValueError("Invalid group format: all elements must be strings")
         
-        # Convert lists to sets
         groups = [set(group) for group in model_output["groups"]]
         return groups
     except (json.JSONDecoder.JSONDecodeError, KeyError, TypeError, ValueError) as e:
@@ -106,9 +98,7 @@ Return ONLY a valid JSON object with your answer."""
 
 
 if __name__ == "__main__":
-    # load the first puzzle from the dataset
     puzzle = data[-1]["input"]
-
 
     groups = generate_candidate_groups_baseline(puzzle)
     print(groups)

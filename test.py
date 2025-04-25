@@ -25,155 +25,11 @@ def extract_answer_groups(output_text):
     return gold_groups
 
 def score_group(group, word_to_embedding):
-    # Convert set to list if it's a set
     group_list = list(group) if isinstance(group, set) else group
     return np.mean([
         util.cos_sim(word_to_embedding[group_list[i]], word_to_embedding[group_list[j]]).item()
         for i in range(len(group_list)) for j in range(i + 1, len(group_list))
     ])
-
-def gpt4_score_group(group, client):
-    # Convert set to list if it's a set
-    group_list = list(group) if isinstance(group, set) else group
-    
-    prompt = f"""Rate how well these 4 words form a coherent thematic group on a scale of 0.0 to 1.0. 
-    Only return the numerical score, no explanation.
-    Words: {', '.join(group_list)}"""
-
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4-turbo",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1
-        )
-        score = float(response.choices[0].message.content.strip())
-        return min(max(score, 0.0), 1.0)  # Ensure score is between 0 and 1
-    except Exception as e:
-        print(f"Error getting GPT-4 score: {e}")
-        return 0.0
-
-def score_groups_with_gpt4(all_groups, client, cache={}):
-    """Score all possible groups using GPT-4, with caching"""
-    scored_groups = []
-    
-    for group in all_groups:
-        # Convert group to frozenset for hashable cache key
-        group_key = frozenset(group)
-        
-        if group_key in cache:
-            score = cache[group_key]
-        else:
-            score = gpt4_score_group(group, client)
-            cache[group_key] = score
-            
-        scored_groups.append((group, score))
-    
-    # Sort by score in descending order
-    scored_groups.sort(key=lambda x: x[1], reverse=True)
-    return scored_groups
-
-def hybrid_score_group(group, word_to_embedding, client, embedding_weight=0.3, gpt_weight=0.7):
-    """Combine embedding-based and GPT-4 scoring"""
-    embedding_score = score_group(group, word_to_embedding)
-    gpt_score = gpt4_score_group(group, client)
-    return (embedding_score * embedding_weight) + (gpt_score * gpt_weight)
-
-def ollama_score_group(group):
-    """Score a group using Ollama's model"""
-    # Convert set to list if it's a set
-    group_list = list(group) if isinstance(group, set) else group
-    
-    system_message = "You are a scoring assistant that ONLY outputs a single number between 0.0 and 1.0. No other text or explanation."
-    prompt = f"Rate how coherent these words are as a thematic group: {', '.join(group_list)}. Output only a number between 0.0 and 1.0."
-
-    try:
-        response = requests.post('http://localhost:11434/api/generate',
-                               json={
-                                   "model": "llama3.2",
-                                   "system": system_message,
-                                   "prompt": prompt,
-                                   "stream": False,
-                                   "temperature": 0.1,  # Very low temperature for more deterministic output
-                                   "top_p": 0.1,       # Lower top_p for more focused sampling
-                                   "num_predict": 10    # Limit the number of tokens to predict
-                               })
-        if response.status_code == 200:
-            result = response.json()
-            score_text = result['response'].strip()
-            # Remove any non-numeric characters except decimal point
-            score_text = ''.join(c for c in score_text if c.isdigit() or c == '.')
-            try:
-                score = float(score_text)
-                return min(max(score, 0.0), 1.0)  # Ensure score is between 0 and 1
-            except ValueError:
-                print(f"Could not parse score from response: {score_text}")
-                return 0.5
-        else:
-            print(f"Error from Ollama API: {response.status_code}")
-            return 0.5
-    except Exception as e:
-        print(f"Error getting Ollama score: {e}")
-        return 0.5
-
-def score_groups_with_ollama(all_groups, cache={}):
-    """Score all possible groups using Ollama, with caching"""
-    scored_groups = []
-    
-    for group in all_groups:
-        # Convert group to frozenset for hashable cache key
-        group_key = frozenset(group)
-        
-        if group_key in cache:
-            score = cache[group_key]
-        else:
-            score = ollama_score_group(group)
-            cache[group_key] = score
-            
-        scored_groups.append((group, score))
-    
-    # Sort by score in descending order
-    scored_groups.sort(key=lambda x: x[1], reverse=True)
-    return scored_groups
-
-def run_ollama_test(puzzle_input): 
-    # Initialize scoring cache
-    ollama_score_cache = {}
-
-    # Generate all possible groups
-    words = clean_input(puzzle_input)
-    all_groups = list(combinations(words, 4))
-
-    # Score groups using Ollama
-    scored_groups = score_groups_with_ollama(all_groups, ollama_score_cache)
-
-    # Run beam search with Ollama scores
-    solution = beam_search_solver(scored_groups, beam_width=3)
-
-    return solution
-
-# Example usage with beam search:
-
-def run_gpt4_embedding_test(client, puzzle_input): 
-    
-    # Initialize scoring cache
-    gpt4_score_cache = {}
-
-    # Generate all possible groups
-    words = clean_input(puzzle_input)
-
-    
-    all_groups = list(combinations(words, 4))
-
-
-    # Score groups using GPT-4
-    scored_groups = score_groups_with_gpt4(all_groups, client, gpt4_score_cache)
-
-    # Run beam search with GPT-4 scores
-    solution = beam_search_solver(scored_groups, beam_width=3)
-
-    return solution
-    
-
 
 def solve(scored_groups, used_words=set(), selected=[], depth=0):
     if len(selected) == 4:
@@ -235,7 +91,6 @@ with open("nyt_dataset.json", "r") as f:
 def run_test(num_puzzles=None):
     model = SentenceTransformer("all-MiniLM-L6-v2")
 
-    # If num_puzzles is specified, limit the dataset
     if num_puzzles is not None:
         puzzles_to_test = puzzles[:num_puzzles]
     else:
@@ -253,7 +108,6 @@ def run_test(num_puzzles=None):
     llm_f1_scores = []
     few_shot_f1_scores = []
 
-    # Greedy decoding metrics via solve (reuse candidate sets, no extra API calls)
     greedy_embed_correct_count = 0
     greedy_embed_f1_scores = []
     greedy_llm_correct_count = 0
@@ -278,24 +132,19 @@ def run_test(num_puzzles=None):
         llm_generated_groups = generate_candidate_groups_baseline(puzzle["input"])
         few_shot_generated_groups = generate_candidate_groups_few_shot(puzzle["input"])
         
-        # Convert sets to lists for scoring
         llm_generated_groups = [list(group) for group in llm_generated_groups]
         few_shot_generated_groups = [list(group) for group in few_shot_generated_groups]
 
-        # Filter out words that don't exist in word_to_embedding
         llm_generated_groups = [
             [word for word in group if word in word_to_embedding]
             for group in llm_generated_groups
         ]
-        # Only keep groups that still have at least 4 words after filtering
         llm_generated_groups = [group for group in llm_generated_groups if len(group) == 4]
 
-        # Also filter few-shot generated groups
         few_shot_generated_groups = [
             [word for word in group if word in word_to_embedding]
             for group in few_shot_generated_groups
         ]
-        # Only keep groups that still have at least 4 words after filtering
         few_shot_generated_groups = [group for group in few_shot_generated_groups if len(group) == 4]
 
         llm_scored_groups = [(group, score_group(group, word_to_embedding)) for group in llm_generated_groups]
@@ -316,7 +165,6 @@ def run_test(num_puzzles=None):
         print(f"\nEvaluating Puzzle #{idx + 1}")
         print("-" * 40)
 
-        # Evaluate Brute Force solution
         if solution:
             predicted_sets = [set(word.upper().strip() for word in group) for group, _ in solution]
             gold_used = set()
@@ -333,7 +181,6 @@ def run_test(num_puzzles=None):
             pred_fs = set(frozenset(g) for g in predicted_sets)
             gold_fs = set(frozenset(g) for g in gold_sets)
 
-            # Calculate F1 score for brute force
             precision, recall, f1 = compute_f1(predicted_sets, gold_sets)
             f1_scores.append(f1)
 
@@ -350,7 +197,6 @@ def run_test(num_puzzles=None):
             print("⚠️ Brute Force: No solution found")
             f1_scores.append(0.0)
 
-        # Evaluate LLM Baseline solution
         if llm_solution:
             llm_predicted_sets = [set(word.upper().strip() for word in group) for group, _ in llm_solution]
             gold_used = set()
@@ -366,7 +212,6 @@ def run_test(num_puzzles=None):
             llm_correct_groups_total += llm_num_correct_groups
             llm_pred_fs = set(frozenset(g) for g in llm_predicted_sets)
 
-            # Calculate F1 score for LLM Baseline
             llm_precision, llm_recall, llm_f1 = compute_f1(llm_predicted_sets, gold_sets)
             llm_f1_scores.append(llm_f1)
 
@@ -383,7 +228,6 @@ def run_test(num_puzzles=None):
             print("⚠️ LLM Baseline: No solution found")
             llm_f1_scores.append(0.0)
 
-        # Evaluate Few-Shot solution
         if few_shot_solution:
             few_shot_predicted_sets = [set(word.upper().strip() for word in group) for group, _ in few_shot_solution]
             gold_used = set()
@@ -399,7 +243,6 @@ def run_test(num_puzzles=None):
             few_shot_correct_groups_total += few_shot_num_correct_groups
             few_shot_pred_fs = set(frozenset(g) for g in few_shot_predicted_sets)
 
-            # Calculate F1 score for Few-Shot
             few_shot_precision, few_shot_recall, few_shot_f1 = compute_f1(few_shot_predicted_sets, gold_sets)
             few_shot_f1_scores.append(few_shot_f1)
 
@@ -416,7 +259,6 @@ def run_test(num_puzzles=None):
             print("⚠️ Few-Shot: No solution found")
             few_shot_f1_scores.append(0.0)
 
-        # Greedy decode via solve for embedding-scored groups
         gold_fs = set(map(frozenset, gold_sets))
         embed_sol = solve(scored_groups)
         if embed_sol:
@@ -437,7 +279,6 @@ def run_test(num_puzzles=None):
         else:
             greedy_embed_f1_scores.append(0.0)
 
-        # Greedy decode via solve for LLM-scored groups
         llm_sol = solve(llm_scored_groups)
         if llm_sol:
             ll_used = set()
@@ -457,7 +298,6 @@ def run_test(num_puzzles=None):
         else:
             greedy_llm_f1_scores.append(0.0)
 
-        # Greedy decode via solve for few-shot-scored groups
         fs_sol = solve(few_shot_scored_groups)
         if fs_sol:
             fs_used = set()
@@ -496,7 +336,6 @@ def run_test(num_puzzles=None):
     print(f"Few-Shot average correct groups per puzzle: {few_shot_correct_groups_total / total:.2f}")
     print(f"Few-Shot average F1 score: {np.mean(few_shot_f1_scores):.2f}")
 
-    # Greedy decoding summaries
     print(f"Greedy Embedding fully correct puzzle accuracy: {greedy_embed_correct_count} / {total} = {greedy_embed_correct_count/total:.2%}")
     print(f"Greedy Embedding average correct groups per puzzle: {greedy_embed_groups_total/total:.2f}")
     print(f"Greedy Embedding average F1 score: {np.mean(greedy_embed_f1_scores):.2f}")
