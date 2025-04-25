@@ -63,7 +63,6 @@ def beam_search_solver(scored_groups, beam_width=3):
     return beams[0][0] if beams else None
 
 def group_to_pairs(group_sets):
-    """Convert a list of groups into a set of unordered word pairs."""
     pairs = set()
     for group in group_sets:
         for a, b in combinations(sorted(group), 2):
@@ -185,16 +184,16 @@ def run_test(num_puzzles=None):
             f1_scores.append(f1)
 
             if pred_fs == gold_fs:
-                print(f"✅ Brute Force: Fully Correct")
+                print(f"Brute Force: Fully Correct")
                 correct_count += 1
             else:
-                print(f"❌ Brute Force: Mismatch")
+                print(f"Brute Force: Mismatch")
                 print("Predicted:")
                 for g in predicted_sets:
                     print(" ", sorted(g))
             print(f"F1: {f1:.2f} | Precision: {precision:.2f} | Recall: {recall:.2f}")
         else:
-            print("⚠️ Brute Force: No solution found")
+            print("Brute Force: No solution found")
             f1_scores.append(0.0)
 
         if llm_solution:
@@ -219,13 +218,13 @@ def run_test(num_puzzles=None):
                 print(f"✅ LLM Baseline: Fully Correct")
                 llm_correct_count += 1
             else:
-                print(f"❌ LLM Baseline: Mismatch")
+                print(f"LLM Baseline: Mismatch")
                 print("LLM Predicted:")
                 for g in llm_predicted_sets:
                     print(" ", sorted(g))
             print(f"F1: {llm_f1:.2f} | Precision: {llm_precision:.2f} | Recall: {llm_recall:.2f}")
         else:
-            print("⚠️ LLM Baseline: No solution found")
+            print("LLM Baseline: No solution found")
             llm_f1_scores.append(0.0)
 
         if few_shot_solution:
@@ -247,16 +246,16 @@ def run_test(num_puzzles=None):
             few_shot_f1_scores.append(few_shot_f1)
 
             if few_shot_pred_fs == gold_fs:
-                print(f"✅ Few-Shot: Fully Correct")
+                print(f"Few-Shot: Fully Correct")
                 few_shot_correct_count += 1
             else:
-                print(f"❌ Few-Shot: Mismatch")
+                print(f"Few-Shot: Mismatch")
                 print("Few-Shot Predicted:")
                 for g in few_shot_predicted_sets:
                     print(" ", sorted(g))
             print(f"F1: {few_shot_f1:.2f} | Precision: {few_shot_precision:.2f} | Recall: {few_shot_recall:.2f}")
         else:
-            print("⚠️ Few-Shot: No solution found")
+            print("Few-Shot: No solution found")
             few_shot_f1_scores.append(0.0)
 
         gold_fs = set(map(frozenset, gold_sets))
