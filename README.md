@@ -1,10 +1,10 @@
-# CS4650 Final Project: LLM-based NYT Connections Solver
+# LLM-based NYT Connections Solver
 
 This repository contains code for a NYT Connections solver that leverages Large Language Models (LLMs) with different prompting strategies and decoding methods.
 
-## Project Overview
+## Overview
 
-This project explores the effectiveness of different LLM approaches for solving NYT Connections game. It compares zero-shot, one-shot, and few-shot prompting strategies combined with different decoding methods (greedy and beam search) to determine the most effective combination.
+This repository explores the effectiveness of different LLM approaches for solving NYT Connections game. It compares zero-shot, one-shot, and few-shot prompting strategies combined with different decoding methods (greedy and beam search) to determine the most effective combination.
 
 ## Repository Structure
 
